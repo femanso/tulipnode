@@ -21,21 +21,21 @@
  *
  */
 
-
 #include <nan.h>
 #include <stdlib.h>
 #include "external/indicators.h"
 using namespace v8;
 
-
-static double *get_array(Local<Array> input, int offset) {
+static double *get_array(Local<Array> input, int offset)
+{
     const int size = input->Length() - offset;
 
-    double *ret = (double*)malloc(sizeof(double) * size);
+    double *ret = (double *)malloc(sizeof(double) * size);
     //TODO check ret
 
     int i;
-    for (i = 0; i < size; ++i) {
+    for (i = 0; i < size; ++i)
+    {
         Nan::Maybe<double> d = Nan::To<double>(Nan::Get(input, i + offset).ToLocalChecked());
         ret[i] = d.FromMaybe(0.0);
     }
@@ -43,39 +43,42 @@ static double *get_array(Local<Array> input, int offset) {
     return ret;
 }
 
+NAN_METHOD(startbyindex)
+{
 
-NAN_METHOD(startbyindex) {
-
-    if (info.Length() != 2) {
+    if (info.Length() != 2)
+    {
         Nan::ThrowTypeError("Wrong number of arguments. Expecting: index, options.");
         return;
     }
 
-    if (!info[0]->IsNumber()) {
+    if (!info[0]->IsNumber())
+    {
         Nan::ThrowTypeError("Expecting first argument to be function index number.");
         return;
     }
 
-    if (!info[1]->IsArray()) {
+    if (!info[1]->IsArray())
+    {
         Nan::ThrowTypeError("Expecting second argument to be array of options.");
         return;
     }
 
     const int index = Nan::To<int>(info[0]).FromMaybe(-1);
-    if (index < 0 || index > TI_INDICATOR_COUNT) {
+    if (index < 0 || index > TI_INDICATOR_COUNT)
+    {
         Nan::ThrowTypeError("Invalid indicator index.");
         return;
     }
 
     const ti_indicator_info *ind = ti_indicators + index;
 
-
     Local<Array> options = Local<Array>::Cast(info[1]);
-    if ((unsigned int)ind->options != options->Length()) {
+    if ((unsigned int)ind->options != options->Length())
+    {
         Nan::ThrowTypeError("Invalid number of options.");
         return;
     }
-
 
     double *option_array = get_array(options, 0);
 
@@ -83,63 +86,64 @@ NAN_METHOD(startbyindex) {
 
     free(option_array);
 
-
     info.GetReturnValue().Set(start);
 }
 
+NAN_METHOD(callbyindex)
+{
 
-NAN_METHOD(callbyindex) {
-
-    if (info.Length() != 4) {
+    if (info.Length() != 4)
+    {
         Nan::ThrowTypeError("Wrong number of arguments. Expecting: index, inputs, options, and callback.");
         return;
     }
 
-    if (!info[0]->IsNumber()) {
+    if (!info[0]->IsNumber())
+    {
         Nan::ThrowTypeError("Expecting first argument to be function index number.");
         return;
     }
 
-    if (!info[1]->IsArray()) {
+    if (!info[1]->IsArray())
+    {
         Nan::ThrowTypeError("Expecting second argument to be array of inputs.");
         return;
     }
 
-    if (!info[2]->IsArray()) {
+    if (!info[2]->IsArray())
+    {
         Nan::ThrowTypeError("Expecting third argument to be array of options.");
         return;
     }
 
-    if (!info[3]->IsFunction()) {
+    if (!info[3]->IsFunction())
+    {
         Nan::ThrowTypeError("Expecting last argument to be callback function.");
         return;
     }
 
     const int index = Nan::To<int>(info[0]).FromMaybe(-1);
-    if (index < 0 || index > TI_INDICATOR_COUNT) {
+    if (index < 0 || index > TI_INDICATOR_COUNT)
+    {
         Nan::ThrowTypeError("Invalid indicator index.");
         return;
     }
 
     const ti_indicator_info *ind = ti_indicators + index;
 
-
-
     Local<Array> inputs = Local<Array>::Cast(info[1]);
-    if ((unsigned int)ind->inputs != inputs->Length()) {
+    if ((unsigned int)ind->inputs != inputs->Length())
+    {
         Nan::ThrowTypeError("Invalid number of inputs.");
         return;
     }
 
-
     Local<Array> options = Local<Array>::Cast(info[2]);
-    if ((unsigned int)ind->options != options->Length()) {
+    if ((unsigned int)ind->options != options->Length())
+    {
         Nan::ThrowTypeError("Invalid number of options.");
         return;
     }
-
-
-
 
     double *input_arr[TI_MAXINDPARAMS] = {0};
     int in_size = -1;
@@ -147,71 +151,69 @@ NAN_METHOD(callbyindex) {
     int i;
 
     /* Find smallest size of input. */
-    for (i = 0; i < ind->inputs; ++i) {
+    for (i = 0; i < ind->inputs; ++i)
+    {
         Local<v8::Value> input = Nan::Get(inputs, i).ToLocalChecked();
 
-        if (!input->IsArray()) {
+        if (!input->IsArray())
+        {
             Nan::ThrowTypeError("Expecting second argument to be array of arrays of numbers.");
             return;
         }
 
         const int size = Local<Array>::Cast(input)->Length();
-        if (in_size == -1 || size < in_size) {
+        if (in_size == -1 || size < in_size)
+        {
             in_size = size;
         }
     }
 
-
-
-
     /* Get input arrays. */
-    for (i = 0; i < ind->inputs; ++i) {
+    for (i = 0; i < ind->inputs; ++i)
+    {
         Local<Array> input = Local<Array>::Cast(Nan::Get(inputs, i).ToLocalChecked());
 
         const int offset = input->Length() - in_size;
         input_arr[i] = get_array(input, offset);
     }
 
-
-
     /* Get option array. */
     double *option_arr = get_array(options, 0);
-
 
     /* Setup output arrays. */
     const int start = ind->start(option_arr);
     const int out_size = start >= 0 ? in_size - start : 0;
 
-
     double *output_arr[TI_MAXINDPARAMS] = {0};
-    for (i = 0; i < ind->outputs; ++i) {
-        output_arr[i] = (double*)malloc(sizeof(double) * out_size);
+    for (i = 0; i < ind->outputs; ++i)
+    {
+        output_arr[i] = (double *)malloc(sizeof(double) * out_size);
     }
-
 
     /* Do the calculation. */
     int result = ind->indicator(in_size, input_arr, option_arr, output_arr);
 
-
     /* Clean up inputs. */
-    for (i = 0; i < ind->inputs; ++i) {
+    for (i = 0; i < ind->inputs; ++i)
+    {
         free(input_arr[i]);
     }
-
 
     /* Clean up options. */
     free(option_arr);
 
-
     Local<Value> cb_argv[2];
 
-    if (result == TI_OKAY) {
+    if (result == TI_OKAY)
+    {
         Local<Array> outputs = Nan::New<Array>(ind->outputs);
 
-        for (i = 0; i < ind->outputs; ++i) {
+        for (i = 0; i < ind->outputs; ++i)
+        {
             Local<Array> out = Nan::New<Array>(out_size);
             int j;
-            for (j = 0; j < out_size; ++j) {
+            for (j = 0; j < out_size; ++j)
+            {
                 Nan::Set(out, j, Nan::New(output_arr[i][j]));
             }
             Nan::Set(outputs, i, out);
@@ -219,28 +221,27 @@ NAN_METHOD(callbyindex) {
 
         cb_argv[0] = Nan::Null();
         cb_argv[1] = outputs;
-
-    } else {
+    }
+    else
+    {
 
         cb_argv[0] = Nan::New<String>("Invalid options").ToLocalChecked();
         cb_argv[1] = Nan::Null();
-
     }
-
 
     /* Clean up outputs. */
-    for (i = 0; i < ind->outputs; ++i) {
+    for (i = 0; i < ind->outputs; ++i)
+    {
         free(output_arr[i]);
     }
-
 
     v8::Local<v8::Function> callbackHandle = info[3].As<v8::Function>();
     Nan::AsyncResource cb("tulind-callback");
     cb.runInAsyncScope(Nan::GetCurrentContext()->Global(), callbackHandle, 2, cb_argv);
 }
 
-
-NAN_MODULE_INIT(Init) {
+NAN_MODULE_INIT(Init)
+{
 
     Local<FunctionTemplate> call = Nan::New<FunctionTemplate>(callbyindex);
     Nan::Set(target, Nan::New("callbyindex").ToLocalChecked(), Nan::GetFunction(call).ToLocalChecked());
@@ -248,12 +249,12 @@ NAN_MODULE_INIT(Init) {
     Local<FunctionTemplate> start = Nan::New<FunctionTemplate>(startbyindex);
     Nan::Set(target, Nan::New("startbyindex").ToLocalChecked(), Nan::GetFunction(start).ToLocalChecked());
 
-
     Local<v8::Object> indicators = Nan::New<v8::Object>();
 
     {
         const ti_indicator_info *info = ti_indicators;
-        while (info->name != 0) {
+        while (info->name != 0)
+        {
             Local<v8::Object> ind = Nan::New<v8::Object>();
             Nan::Set(indicators, Nan::New(info->name).ToLocalChecked(), ind);
 
@@ -263,22 +264,23 @@ NAN_MODULE_INIT(Init) {
 
             char const *type = "unknown";
 
-            switch (info->type) {
-                case TI_TYPE_OVERLAY:
-                    type = "overlay";
-                    break;
-                case TI_TYPE_INDICATOR:
-                    type = "indicator";
-                    break;
-                case TI_TYPE_MATH:
-                    type = "math";
-                    break;
-                case TI_TYPE_SIMPLE:
-                    type = "simple";
-                    break;
-                case TI_TYPE_COMPARATIVE:
-                    type = "comparative";
-                    break;
+            switch (info->type)
+            {
+            case TI_TYPE_OVERLAY:
+                type = "overlay";
+                break;
+            case TI_TYPE_INDICATOR:
+                type = "indicator";
+                break;
+            case TI_TYPE_MATH:
+                type = "math";
+                break;
+            case TI_TYPE_SIMPLE:
+                type = "simple";
+                break;
+            case TI_TYPE_COMPARATIVE:
+                type = "comparative";
+                break;
             }
 
             Nan::Set(ind, Nan::New("type").ToLocalChecked(), Nan::New(type).ToLocalChecked());
@@ -306,15 +308,14 @@ NAN_MODULE_INIT(Init) {
 
             ++info;
         }
-
     }
-
 
     Nan::Set(target, Nan::New("indicators").ToLocalChecked(), indicators);
 
     Nan::Set(target, Nan::New("version").ToLocalChecked(), Nan::New(TI_VERSION).ToLocalChecked());
-
 }
 
-NODE_MODULE(tulind, Init)
-
+NODE_MODULE_INIT()
+{
+    Init(exports);
+}
